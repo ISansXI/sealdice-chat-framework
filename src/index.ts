@@ -28,14 +28,14 @@ function main() {
     return seal.ext.newCmdExecuteResult(true);
   }
 
+  // 注册非命令
+  ext.onNotCommandReceived = (ctx, msg) => {
+    normalMessageDeal(ctx, msg, ext);
+  }
+
   // 注册命令
   for (let word of misc.CF_EXT_INFO.awake_words) {
     ext.cmdMap[word] = cmdSeal;
-  }
-
-  // 注册非命令
-  ext.onMessageReceived = (ctx, msg) => {
-    normalMessageDeal(ctx, msg, ext);
   }
 
   // 注册扩展
@@ -45,11 +45,10 @@ function main() {
   seal.ext.registerIntConfig(ext, "probMin", 1);
   seal.ext.registerIntConfig(ext, "probMax", 100);
   seal.ext.registerIntConfig(ext, "probTrigger", 5);
-  seal.ext.registerIntConfig(ext, "probTriggerModelIndex", 0);
   seal.ext.registerStringConfig(ext, "如何填写modelInfo", "Name|Type|Url|Key");
   seal.ext.registerOptionConfig(ext, "目前支持的Type", "请选择", ["请选择", "Qwen"]);
-  seal.ext.registerTemplateConfig(ext, "modelInfo", []);
-  
+  seal.ext.registerTemplateConfig(ext, "modelInfo", ["Name|Type|Url|Key", "more", "more"]);
+
 }
 
 main();

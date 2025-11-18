@@ -1,4 +1,4 @@
-var filename = 'sealdice-js-ext.js'
+var filename = 'sealdice-sans-chat-framework-ext.js'
 
 module.exports = {
   dev: {

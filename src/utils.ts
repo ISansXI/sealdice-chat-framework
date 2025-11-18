@@ -18,7 +18,7 @@ interface GroupDataStruct {
 interface OptionStruct {
     method: string,
     headers: {
-        Authorization : string,
+        Authorization: string,
         'Content-Type': string
     },
     body: string
@@ -86,7 +86,7 @@ function checkPLevel(pLevel: number): number {
     }
 }
 
-function adaptRequestOption(data: GroupDataStruct, ext:seal.ExtInfo, question: string, ctx: seal.MsgContext): OptionStruct{
+function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: string, ctx: seal.MsgContext): OptionStruct {
     const aiArgs = seal.ext.getTemplateConfig(ext, "modelInfo")[data.aiNum].split("|");
     // aiArgs: Name|Type|Url|Key
 
@@ -106,11 +106,21 @@ function adaptRequestOption(data: GroupDataStruct, ext:seal.ExtInfo, question: s
     let pMs = data.pMemory;
     let tMs = data.tMemory;
     let cMs = data.cMemory;
-    switch(type) {
+    switch (type) {
         case TYPE[0]:
             // Qwen
             // 设定Auth
             option.headers.Authorization = `Bearer ${aiArgs[3]}`;
+            // 加载当前问题
+            let message = {};
+            message["role"] = "user";
+            message["content"] = `对象"${ctx.player.name}"于[${getNowFormattedTime()}]提出:${question}`;
+            messages.unshift(message);
+            // 加载身份设定
+            let message1 = {};
+            message1["role"] = "user";
+            message1["content"] = `你现在叫Q3,一名群聊助手,比较擅长吐槽,接下来会有不同的要求或人在群聊里说话。你的制造主为一名叫'地星'的人。`;
+            messages.unshift(message1);
             // 加载永久记忆
             for (let m of pMs) {
                 let message = {};
@@ -128,20 +138,15 @@ function adaptRequestOption(data: GroupDataStruct, ext:seal.ExtInfo, question: s
             // 加载临时记忆
             let count = 0;
             for (let m of tMs) {
-                if(count == 100) {
+                if (count == 100) {
                     break;
                 }
                 let message = {};
                 message["role"] = m.getRole();
                 message["content"] = m.toFormattedString();
                 messages.unshift(message);
-                count ++;
+                count++;
             }
-            // 加载当前问题
-            let message = {};
-            message["role"] = "user";
-            message["content"] = `对象"${ctx.player.name}"于[${getNowFormattedTime()}]提出:${question}`;
-            messages.unshift(message);
             break;
         default:
             return null;
@@ -168,7 +173,7 @@ function adaptRequestResponse(data: GroupDataStruct, ext: seal.ExtInfo, response
 
     // 根据模型获取数据
     const type = aiArgs[1];
-    switch(type) {
+    switch (type) {
         case TYPE[0]:
             // Qwen
             role = "assistant";
@@ -180,12 +185,12 @@ function adaptRequestResponse(data: GroupDataStruct, ext: seal.ExtInfo, response
     }
 }
 
-    /**
-     * 辅助方法：数字补零
-     * @param num 需要补零的数字
-     * @returns 补零后的字符串
-     */
-    function padZero(num: number): string {
+/**
+ * 辅助方法：数字补零
+ * @param num 需要补零的数字
+ * @returns 补零后的字符串
+ */
+function padZero(num: number): string {
     return num < 10 ? `0${num}` : num.toString();
 }
 /**

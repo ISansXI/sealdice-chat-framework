@@ -10,7 +10,7 @@ export function run(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
     }
 
     let showHelp = false;
-    switch(cmds[0]) {
+    switch (cmds[0]) {
         case 'a':
         case 'ask': {
             askFunc(ctx, msg, cmdArgs, ext);
@@ -37,7 +37,7 @@ export function run(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
         }
         case 'memory':
         case 'm': {
-            switch(cmds[1]) {
+            switch (cmds[1]) {
                 case 'add':
                 case 'a': {
                     addPM(ctx, msg, cmdArgs, ext);
@@ -67,13 +67,15 @@ export function run(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
         default:
             showHelp = true;
     }
-    if(showHelp) {
+    if (showHelp) {
         seal.replyToSender(ctx, msg, CF_HELP_DOCUMENT.base);
     }
     return;
 }
 
-export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext:seal.ExtInfo) {
+export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext: seal.ExtInfo) {
+    if (msg.messageType == 'private') return;
+
     let groupDataGet = util.getData(ext);
     groupDataGet = initGroupData(groupDataGet, ctx.group.groupId);
 
@@ -85,29 +87,25 @@ export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext:s
     let probMin = seal.ext.getIntConfig(ext, "probMin");
     let probMax = seal.ext.getIntConfig(ext, "probMax");
     let probTrigger = seal.ext.getIntConfig(ext, "probTrigger");
-    let probTriggerModelIndex = seal.ext.getIntConfig(ext, "probTriggerModelIndex");
 
     const models = seal.ext.getTemplateConfig(ext, "modelInfo");
-    let modelArgs = models[probTriggerModelIndex].split("|");
+    let modelArgs = models[groupDataGet[groupId].aiNum].split("|");
 
     // 根据模型构建请求
     const rawCmds = msg.message;
-    const options = util.adapt(groupDataGet[groupId], ext, rawCmds, ctx);
+    const options = util.adapt(groupDataGet[groupId], ext, rawCmds + "。请Q3用20个字以内来参与我们之间的对话。", ctx);
     const url = modelArgs[2];
 
     // 随机随机数，看看是否会触发
     let result = util.gRI(probMin, probMax);
 
     // 触发回复概率
-    if(result <= probTrigger) {
+    if (result <= probTrigger) {
+        console.log("触发随机回复");
         fetch(url, options)
             .then((data) => {
                 const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
-                util.getTextAsImageBase64(responseM.getContent(), ctx.player.name).then((imageURL) => {
-                    seal.replyToSender(ctx, msg, `[CQ:image,file=http://www.foundryvvt.cn:5000/images/${imageURL.image}.png]`)
-                }).catch((error) => {
-                    console.log(error);
-                });
+                seal.replyToSender(ctx, msg, responseM.getContent());
                 // 一切都没问题后，保存新的对话记忆
                 groupDataGet[groupId].tMemory.unshift(responseM);
                 // 保存对话结果
@@ -158,29 +156,29 @@ function askFunc(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs,
     const options = util.adapt(groupDataGet[groupId], ext, rawCmds, ctx);
     const url = aiArgs[2];
     fetch(url, options)
-    .then((data) => {
-        const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
-        util.getTextAsImageBase64(responseM.getContent(), ctx.player.name).then((imageURL) => {
-            seal.replyToSender(ctx, msg, `[CQ:image,file=http://www.foundryvvt.cn:5000/images/${imageURL.image}.png]`)
-        }).catch((error) => {
+        .then((data) => {
+            const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
+            util.getTextAsImageBase64(responseM.getContent(), ctx.player.name).then((imageURL) => {
+                seal.replyToSender(ctx, msg, `[CQ:image,file=http://www.foundryvvt.cn:5000/images/${imageURL.image}.png]`)
+            }).catch((error) => {
+                console.log(error);
+            });
+            // 一切都没问题后，保存新的对话记忆
+            // 构建用户问题的记忆
+            const userM = new Memory(userName, "user", Date.now(), rawCmds);
+            groupDataGet[groupId].cMemory.unshift(userM);
+            groupDataGet[groupId].cMemory.unshift(responseM);
+            // 保存对话结果
+            util.saveData(ext, groupDataGet);
+        })
+        .catch((error) => {
             console.log(error);
         });
-        // 一切都没问题后，保存新的对话记忆
-        // 构建用户问题的记忆
-        const userM = new Memory(userName, "user", Date.now(), rawCmds);
-        groupDataGet[groupId].cMemory.unshift(userM);
-        groupDataGet[groupId].cMemory.unshift(responseM);
-        // 保存对话结果
-        util.saveData(ext, groupDataGet);
-    })
-    .catch((error) => {
-        console.log(error);
-    });
 }
 
 function switchAutoRecord(ctx: seal.MsgContext, msg: seal.Message, _cmdArgs: seal.CmdArgs, ext: seal.ExtInfo) {
     const groupId = ctx.group.groupId;
-    if(util.checkPLevel(ctx.privilegeLevel) < 2) {
+    if (util.checkPLevel(ctx.privilegeLevel) < 2) {
         seal.replyToSender(ctx, msg, CF_RUN_INFO.p_level_not_enough);
         return;
     }
@@ -200,10 +198,10 @@ function showAvailableModels(ctx: seal.MsgContext, msg: seal.Message, _cmdArgs: 
     const models = seal.ext.getTemplateConfig(ext, "modelInfo");
     let info = "";
     let i = 1;
-    for(const m of models) {
+    for (const m of models) {
         const mArgs = m.split("|");
         info += `${i}、${mArgs[0]}\n`;
-        i ++;
+        i++;
     }
     seal.replyToSender(ctx, msg, info);
 }
@@ -212,12 +210,12 @@ function switchToModel(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.Cm
     const models = seal.ext.getTemplateConfig(ext, "modelInfo");
     let cmds = cmdArgs.getRestArgsFrom(1).split(" ");
     let index = parseInt(cmds[2]);
-    if(index > models.length) index = models.length;
-    else if(index < 1) index = 1;
-    index --;
+    if (index > models.length) index = models.length;
+    else if (index < 1) index = 1;
+    index--;
     const selected = models[index];
     const sArgs = selected.split("|");
-    
+
     let data = util.getData(ext);
     data = initGroupData(data, ctx.group.groupId);
     data[ctx.group.groupId].aiNum = index;
@@ -233,7 +231,7 @@ function addPM(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs, e
     }
     const rawCmds = cmdArgs.getRestArgsFrom(3);
     const memory = new Memory(ctx.player.name, "user", Date.now(), `此项作为一条必须遵循的信息参考：${rawCmds}`);
-    
+
     let data = util.getData(ext);
     data = initGroupData(data, ctx.group.groupId);
 
@@ -248,15 +246,15 @@ function deleteM(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs,
         return;
     }
     let indexRaw = cmdArgs.getArgN(3);
-    
+
     let data = util.getData(ext);
     data = initGroupData(data, ctx.group.groupId);
 
     let index = parseInt(indexRaw);
-    if(index < 1) index = 1;
+    if (index < 1) index = 1;
     else if (index > data[ctx.group.groupId].pMemory.length) index = data[ctx.group.groupId].pMemory.length;
 
-    index --;
+    index--;
 
     data[ctx.group.groupId].pMemory.splice(index, 1);
     util.saveData(ext, data);
@@ -266,7 +264,7 @@ function getPMemory(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
     let page = parseInt(cmdArgs.getArgN(3));
     let groupId = ctx.group.groupId;
     if (page < 1) page = 1;
-    
+
     let data = util.getData(ext);
     data = initGroupData(data, groupId);
 
