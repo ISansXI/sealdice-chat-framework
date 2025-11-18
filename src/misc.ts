@@ -3,8 +3,8 @@ export const CF_EXT_INFO = {
     "author": "地星 AKA Sans",
     "version": "1.0.0",
     "awake_words": [
-        "chat-framework",
-        "cf"
+        ".chat-framework",
+        ".cf"
     ]
 }
 

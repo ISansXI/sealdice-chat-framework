@@ -1,54 +1,54 @@
 import { normalMessageDeal, run } from "./deal";
 import * as misc from "./misc"
 
-function main() {
-  // 创建扩展
-  let ext = seal.ext.find(misc.CF_EXT_INFO.ext_name);
-  if (!ext) {
-    ext = seal.ext.new(misc.CF_EXT_INFO.ext_name, misc.CF_EXT_INFO.author, misc.CF_EXT_INFO.version);
-  }
-
-  // 编写指令
-  const cmdSeal = seal.ext.newCmdItemInfo();
-  cmdSeal.name = misc.CF_EXT_INFO.ext_name;
-  cmdSeal.help = misc.CF_HELP_DOCUMENT.base;
-
-  cmdSeal.solve = (ctx, msg, cmdArgs) => {
-    let val = cmdArgs.getArgN(1);
-    switch (val) {
-      case 'help': {
-        const ret = seal.ext.newCmdExecuteResult(true);
-        ret.showHelp = true;
-        return ret;
-      }
-      default: {
-        run(ctx, msg, cmdArgs, ext);
-      }
-    }
-    return seal.ext.newCmdExecuteResult(true);
-  }
-
-  // 注册非命令
-  ext.onNotCommandReceived = (ctx, msg) => {
-    normalMessageDeal(ctx, msg, ext);
-  }
-
-  // 注册命令
-  for (let word of misc.CF_EXT_INFO.awake_words) {
-    ext.cmdMap[word] = cmdSeal;
-  }
-
+console.log('chat-framework 插件加载')
+// 创建扩展
+let ext = seal.ext.find(misc.CF_EXT_INFO.ext_name);
+if (!ext) {
+  ext = seal.ext.new(misc.CF_EXT_INFO.ext_name, misc.CF_EXT_INFO.author, misc.CF_EXT_INFO.version);
   // 注册扩展
   seal.ext.register(ext);
-
-  // 注册配置项
-  seal.ext.registerIntConfig(ext, "probMin", 1);
-  seal.ext.registerIntConfig(ext, "probMax", 100);
-  seal.ext.registerIntConfig(ext, "probTrigger", 5);
-  seal.ext.registerStringConfig(ext, "如何填写modelInfo", "Name|Type|Url|Key");
-  seal.ext.registerOptionConfig(ext, "目前支持的Type", "请选择", ["请选择", "Qwen"]);
-  seal.ext.registerTemplateConfig(ext, "modelInfo", ["Name|Type|Url|Key", "more", "more"]);
-
 }
 
-main();
+// 编写指令
+const cmdChatFramework = seal.ext.newCmdItemInfo();
+cmdChatFramework.name = misc.CF_EXT_INFO.ext_name;
+cmdChatFramework.help = misc.CF_HELP_DOCUMENT.base;
+
+cmdChatFramework.solve = (ctx, msg, cmdArgs) => {
+  console.log("接收到指令:", msg.message); // 新增日志，打印原始指令
+  console.log("解析的唤醒词:", cmdArgs.getArgN(0)); // 打印第一个参数（唤醒词）
+  let val = cmdArgs.getArgN(1);
+  switch (val) {
+    case 'help': {
+      const ret = seal.ext.newCmdExecuteResult(true);
+      ret.showHelp = true;
+      return ret;
+    }
+    default: {
+      run(ctx, msg, cmdArgs, ext);
+      return seal.ext.newCmdExecuteResult(true);
+    }
+  }
+}
+
+// 注册非命令
+ext.onNotCommandReceived = (ctx, msg) => {
+  normalMessageDeal(ctx, msg, ext);
+}
+
+// 注册命令
+for (let word of misc.CF_EXT_INFO.awake_words) {
+  ext.cmdMap[word] = cmdChatFramework;
+  console.log(`已注册唤醒词: ${word}`); // 新增日志
+}
+
+// 注册配置项
+seal.ext.registerIntConfig(ext, "probMin", 1);
+seal.ext.registerIntConfig(ext, "probMax", 100);
+seal.ext.registerIntConfig(ext, "probTrigger", 5);
+seal.ext.registerTemplateConfig(ext, "modelInfo", ["Name|Type|Url|Key"]);
+
+console.log('插件注册结果：', seal.ext.find(misc.CF_EXT_INFO.ext_name) ? '成功' : '失败');
+console.log('命令对象是否有效：', cmdChatFramework && typeof cmdChatFramework.solve === 'function' ? '是' : '否');
+

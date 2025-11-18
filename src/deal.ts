@@ -76,6 +76,16 @@ export function run(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
 export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext: seal.ExtInfo) {
     if (msg.messageType == 'private') return;
 
+    let probMin = seal.ext.getIntConfig(ext, "probMin");
+    let probMax = seal.ext.getIntConfig(ext, "probMax");
+    let probTrigger = seal.ext.getIntConfig(ext, "probTrigger");
+
+    // 随机随机数，看看是否会触发
+    let result = util.gRI(probMin, probMax);
+
+    if (result > probTrigger) return;
+
+    // 触发回复概率
     let groupDataGet = util.getData(ext);
     groupDataGet = initGroupData(groupDataGet, ctx.group.groupId);
 
@@ -84,10 +94,6 @@ export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext: 
         return;
     }
 
-    let probMin = seal.ext.getIntConfig(ext, "probMin");
-    let probMax = seal.ext.getIntConfig(ext, "probMax");
-    let probTrigger = seal.ext.getIntConfig(ext, "probTrigger");
-
     const models = seal.ext.getTemplateConfig(ext, "modelInfo");
     let modelArgs = models[groupDataGet[groupId].aiNum].split("|");
 
@@ -95,26 +101,20 @@ export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext: 
     const rawCmds = msg.message;
     const options = util.adapt(groupDataGet[groupId], ext, rawCmds + "。请Q3用20个字以内来参与我们之间的对话。", ctx);
     const url = modelArgs[2];
-
-    // 随机随机数，看看是否会触发
-    let result = util.gRI(probMin, probMax);
-
-    // 触发回复概率
-    if (result <= probTrigger) {
-        console.log("触发随机回复");
-        fetch(url, options)
-            .then((data) => {
-                const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
-                seal.replyToSender(ctx, msg, responseM.getContent());
-                // 一切都没问题后，保存新的对话记忆
-                groupDataGet[groupId].tMemory.unshift(responseM);
-                // 保存对话结果
-                util.saveData(ext, groupDataGet);
-            })
-            .catch((error) => {
-                console.log(error);
-            });
-    }
+    
+    console.log("触发随机回复");
+    fetch(url, options)
+        .then((data) => {
+            const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
+            seal.replyToSender(ctx, msg, responseM.getContent());
+            // 一切都没问题后，保存新的对话记忆
+            groupDataGet[groupId].tMemory.unshift(responseM);
+            // 保存对话结果
+            util.saveData(ext, groupDataGet);
+        })
+        .catch((error) => {
+            console.log(error);
+        });
 }
 
 interface GroupDataStruct {
