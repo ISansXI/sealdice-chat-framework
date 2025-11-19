@@ -17,7 +17,6 @@ cmdChatFramework.help = misc.CF_HELP_DOCUMENT.base;
 
 cmdChatFramework.solve = (ctx, msg, cmdArgs) => {
   console.log("接收到指令:", msg.message); // 新增日志，打印原始指令
-  console.log("解析的唤醒词:", cmdArgs.getArgN(0)); // 打印第一个参数（唤醒词）
   let val = cmdArgs.getArgN(1);
   switch (val) {
     case 'help': {
@@ -47,7 +46,9 @@ for (let word of misc.CF_EXT_INFO.awake_words) {
 seal.ext.registerIntConfig(ext, "probMin", 1);
 seal.ext.registerIntConfig(ext, "probMax", 100);
 seal.ext.registerIntConfig(ext, "probTrigger", 5);
-seal.ext.registerTemplateConfig(ext, "modelInfo", ["Name|Type|Url|Key"]);
+seal.ext.registerStringConfig(ext, "quickModelInfo", "Name|Type|Url|Key");
+seal.ext.registerStringConfig(ext, "prompt", "你现在叫Q3,一名群聊助手,比较擅长吐槽,接下来会有不同的要求或人在群聊里说话。你的制造主为一名叫'地星'的人。");
+seal.ext.registerTemplateConfig(ext, "modelInfo", ["Name|Type|Url|Key|Description"]);
 
 console.log('插件注册结果：', seal.ext.find(misc.CF_EXT_INFO.ext_name) ? '成功' : '失败');
 console.log('命令对象是否有效：', cmdChatFramework && typeof cmdChatFramework.solve === 'function' ? '是' : '否');

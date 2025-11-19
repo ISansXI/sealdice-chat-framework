@@ -94,8 +94,8 @@ function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: 
     let option = {
         method: 'POST',
         headers: {
-            Authorization: '',
-            'Content-Type': 'applicaiton/json'
+            'Authorization': '',
+            'Content-Type': 'application/json'
         },
         body: ''
     }
@@ -103,12 +103,13 @@ function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: 
     // 拼接记忆并调整option
     const type = aiArgs[1];
     let messages = [];
+    let body = {};
     let pMs = data.pMemory;
     let tMs = data.tMemory;
     let cMs = data.cMemory;
     switch (type) {
-        case TYPE[0]:
-            // Qwen
+        case TYPE[0]: {
+            // SiliconCloud
             // 设定Auth
             option.headers.Authorization = `Bearer ${aiArgs[3]}`;
             // 加载当前问题
@@ -124,15 +125,15 @@ function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: 
             // 加载永久记忆
             for (let m of pMs) {
                 let message = {};
-                message["role"] = m.getRole();
-                message["content"] = m.toFormattedString();
+                message["role"] = m.role;
+                message["content"] = m.content;
                 messages.unshift(message);
             }
             // 加载对话记忆
             for (let m of cMs) {
                 let message = {};
-                message["role"] = m.getRole();
-                message["content"] = m.toFormattedString();
+                message["role"] = m.role;
+                message["content"] = m.content;
                 messages.unshift(message);
             }
             // 加载临时记忆
@@ -142,8 +143,132 @@ function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: 
                     break;
                 }
                 let message = {};
-                message["role"] = m.getRole();
-                message["content"] = m.toFormattedString();
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+                count++;
+            }
+
+            body["model"] = aiArgs[0];
+            body["messages"] = messages;
+            option.body = JSON.stringify(body);
+            break;
+        }
+        case TYPE[1]: {
+            // MonoCloud
+            // 设定Auth
+            option.headers.Authorization = `Bearer ${aiArgs[3]}`;
+            // 加载当前问题
+            let message = {};
+            message["role"] = "user";
+            message["content"] = `对象"${ctx.player.name}"于[${getNowFormattedTime()}]提出:${question}`;
+            messages.unshift(message);
+            // 加载身份设定
+            let message1 = {};
+            message1["role"] = "user";
+            message1["content"] = `你现在叫Q3,一名群聊助手,比较擅长吐槽,接下来会有不同的要求或人在群聊里说话。你的制造主为一名叫'地星'的人。`;
+            messages.unshift(message1);
+            // 加载永久记忆
+            for (let m of pMs) {
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+            }
+            // 加载对话记忆
+            for (let m of cMs) {
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+            }
+            // 加载临时记忆
+            let count = 0;
+            for (let m of tMs) {
+                if (count == 100) {
+                    break;
+                }
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+                count++;
+            }
+
+            body["model"] = aiArgs[0];
+            body["messages"] = messages;
+            option.body = JSON.stringify(body);
+            break;
+        }
+        default:
+            return null;
+    }
+
+    // console.log(JSON.stringify(body));
+
+    return option;
+}
+
+function adaptRequestOptionQuick(data: GroupDataStruct, ext: seal.ExtInfo, question: string, ctx: seal.MsgContext): OptionStruct {
+    const aiArgs = seal.ext.getStringConfig(ext, "quickModelInfo").split("|");
+    // aiArgs: Name|Type|Url|Key
+
+    // 构建初始化的option
+    let option = {
+        method: 'POST',
+        headers: {
+            Authorization: '',
+            'Content-Type': 'application/json'
+        },
+        body: ''
+    }
+
+    // 拼接记忆并调整option
+    const type = aiArgs[1];
+    let messages = [];
+    let pMs = data.pMemory;
+    let tMs = data.tMemory;
+    let cMs = data.cMemory;
+    switch (type) {
+        case TYPE[0]:
+        case TYPE[1]:
+            // SiliconCloud MonoCloud
+            // 设定Auth
+            option.headers.Authorization = `Bearer ${aiArgs[3]}`;
+            // 加载当前问题
+            let message = {};
+            message["role"] = "user";
+            message["content"] = `对象"${ctx.player.name}"于[${getNowFormattedTime()}]提出:${question}`;
+            messages.unshift(message);
+            // 加载身份设定
+            let message1 = {};
+            message1["role"] = "user";
+            let prompt = seal.ext.getStringConfig(ext, "prompt");
+            message1["content"] = `${prompt}`;
+            messages.unshift(message1);
+            // 加载永久记忆
+            for (let m of pMs) {
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+            }
+            // 加载对话记忆
+            for (let m of cMs) {
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
+                messages.unshift(message);
+            }
+            // 加载临时记忆
+            let count = 0;
+            for (let m of tMs) {
+                if (count == 100) {
+                    break;
+                }
+                let message = {};
+                message["role"] = m.role;
+                message["content"] = m.content;
                 messages.unshift(message);
                 count++;
             }
@@ -161,8 +286,12 @@ function adaptRequestOption(data: GroupDataStruct, ext: seal.ExtInfo, question: 
     return option;
 }
 
-function adaptRequestResponse(data: GroupDataStruct, ext: seal.ExtInfo, responseData: any): Memory {
+function adaptRequestResponse(data: GroupDataStruct, ext: seal.ExtInfo, responseDataRaw: any): Memory {
     const aiArgs = seal.ext.getTemplateConfig(ext, "modelInfo")[data.aiNum].split("|");
+
+    let responseData = JSON.parse(responseDataRaw.body)
+    // console.log(JSON.stringify(responseData));
+    // console.log(JSON.stringify(responseData.choices[0]));
     // aiArgs: Name|Type|Url|Key
 
     // 关键词确认
@@ -175,7 +304,8 @@ function adaptRequestResponse(data: GroupDataStruct, ext: seal.ExtInfo, response
     const type = aiArgs[1];
     switch (type) {
         case TYPE[0]:
-            // Qwen
+        case TYPE[1]:
+            // SiliconCloud ChatGPT
             role = "assistant";
             content = responseData.choices[0].message.content;
             const m = new Memory(creator, role, createTime, content);
@@ -202,6 +332,15 @@ function getNowFormattedTime(): string {
     return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())} ${padZero(date.getHours())}:${padZero(date.getMinutes())}:${padZero(date.getSeconds())}`;
 }
 
+/**
+ * 格式化显示记忆创建时间
+ * @returns 格式化后的时间字符串（如：2025-11-18 12:30:45）
+ */
+function getFormattedTime(timestamp): string {
+    const date = new Date(timestamp);
+    return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())} ${padZero(date.getHours())}:${padZero(date.getMinutes())}:${padZero(date.getSeconds())}`;
+}
+
 function getRandomInteger(a: number, b: number): number {
     // 确保a和b都是整数
     const min = Math.ceil(a);
@@ -221,7 +360,10 @@ export {
     saveData,
     checkPLevel,
     adaptRequestOption as adapt,
+    adaptRequestOptionQuick as adaptQ,
     adaptRequestResponse as adaptRes,
     getTextAsImageBase64,
-    getRandomInteger as gRI
+    getRandomInteger as gRI,
+    getNowFormattedTime,
 }
+

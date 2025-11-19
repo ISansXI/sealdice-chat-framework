@@ -64,6 +64,10 @@ export function run(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
             }
             break;
         }
+        case 'config': {
+            setConfig(ctx, msg, cmdArgs, ext, cmds);
+            break;
+        }
         default:
             showHelp = true;
     }
@@ -80,41 +84,44 @@ export function normalMessageDeal(ctx: seal.MsgContext, msg: seal.Message, ext: 
     let probMax = seal.ext.getIntConfig(ext, "probMax");
     let probTrigger = seal.ext.getIntConfig(ext, "probTrigger");
 
-    // 随机随机数，看看是否会触发
-    let result = util.gRI(probMin, probMax);
-
-    if (result > probTrigger) return;
-
-    // 触发回复概率
+    const m = new Memory(ctx.player.name, "user", Date.now(), `${ctx.player.name}于[${util.getNowFormattedTime()}]发表:"${msg.message}"`);
     let groupDataGet = util.getData(ext);
     groupDataGet = initGroupData(groupDataGet, ctx.group.groupId);
 
-    let groupId = ctx.group.groupId;
-    if (groupDataGet[groupId].autoRecord == 0) {
-        return;
+    groupDataGet[ctx.group.groupId].tMemory.unshift(m);
+
+    // 随机随机数，看看是否会触发
+    let result = util.gRI(probMin, probMax);
+    if (result > probTrigger) return;
+    else {
+        // 触发回复概率
+        let groupId = ctx.group.groupId;
+        if (groupDataGet[groupId].autoRecord == 0) {
+            return;
+        }
+        const models = seal.ext.getStringConfig(ext, "quickModelInfo");
+        let modelArgs = models.split("|");
+
+        // 根据模型构建请求
+        const rawCmds = msg.message;
+        const options = util.adaptQ(groupDataGet[groupId], ext, rawCmds + "。请Q3用20个字以内来参与我们之间的对话。", ctx);
+        const url = modelArgs[2];
+
+        console.log("触发随机回复");
+        fetch(url, options)
+            .then((data) => {
+                const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
+                seal.replyToSender(ctx, msg, responseM.getContent());
+                // 一切都没问题后，保存新的对话记忆
+                groupDataGet[groupId].tMemory.unshift(responseM);
+            })
+            .catch((error) => {
+                console.log(error);
+            });
     }
-
-    const models = seal.ext.getTemplateConfig(ext, "modelInfo");
-    let modelArgs = models[groupDataGet[groupId].aiNum].split("|");
-
-    // 根据模型构建请求
-    const rawCmds = msg.message;
-    const options = util.adapt(groupDataGet[groupId], ext, rawCmds + "。请Q3用20个字以内来参与我们之间的对话。", ctx);
-    const url = modelArgs[2];
-    
-    console.log("触发随机回复");
-    fetch(url, options)
-        .then((data) => {
-            const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
-            seal.replyToSender(ctx, msg, responseM.getContent());
-            // 一切都没问题后，保存新的对话记忆
-            groupDataGet[groupId].tMemory.unshift(responseM);
-            // 保存对话结果
-            util.saveData(ext, groupDataGet);
-        })
-        .catch((error) => {
-            console.log(error);
-        });
+    groupDataGet[ctx.group.groupId].tMemory.splice(0, 100);
+    // 保存对话结果
+    util.saveData(ext, groupDataGet);
 }
 
 interface GroupDataStruct {
@@ -130,6 +137,14 @@ function initGroupData(dataB, groupId: string): any {
     if (data[groupId] == null) {
         let groupInfo: GroupDataStruct = { pMemory: [], tMemory: [], cMemory: [], aiNum: 0, autoRecord: 0 };
         data[groupId] = groupInfo;
+    }
+    if (data["config"] == null) {
+        data["config"] = {
+            "probMin": 1,
+            "probMax": 100,
+            "probTrigger": 10,
+            "modelInfo": []
+        }
     }
     return data;
 }
@@ -157,6 +172,7 @@ function askFunc(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs,
     const url = aiArgs[2];
     fetch(url, options)
         .then((data) => {
+            // console.log(JSON.stringify(data));
             const responseM = util.adaptRes(groupDataGet[groupId], ext, data);
             util.getTextAsImageBase64(responseM.getContent(), ctx.player.name).then((imageURL) => {
                 seal.replyToSender(ctx, msg, `[CQ:image,file=http://www.foundryvvt.cn:5000/images/${imageURL.image}.png]`)
@@ -165,7 +181,7 @@ function askFunc(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs,
             });
             // 一切都没问题后，保存新的对话记忆
             // 构建用户问题的记忆
-            const userM = new Memory(userName, "user", Date.now(), rawCmds);
+            const userM = new Memory(userName, "user", Date.now(), `对象"${ctx.player.name}"于[${util.getNowFormattedTime()}]提出:${rawCmds}`);
             groupDataGet[groupId].cMemory.unshift(userM);
             groupDataGet[groupId].cMemory.unshift(responseM);
             // 保存对话结果
@@ -200,7 +216,7 @@ function showAvailableModels(ctx: seal.MsgContext, msg: seal.Message, _cmdArgs: 
     let i = 1;
     for (const m of models) {
         const mArgs = m.split("|");
-        info += `${i}、${mArgs[0]}\n`;
+        info += `${i}、${mArgs[0]} (${mArgs[4]})\n`;
         i++;
     }
     seal.replyToSender(ctx, msg, info);
@@ -258,9 +274,11 @@ function deleteM(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs,
 
     data[ctx.group.groupId].pMemory.splice(index, 1);
     util.saveData(ext, data);
+    seal.replyToSender(ctx, msg, `done`);
 }
 
 function getPMemory(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdArgs, ext: seal.ExtInfo) {
+    
     let page = parseInt(cmdArgs.getArgN(3));
     let groupId = ctx.group.groupId;
     if (page < 1) page = 1;
@@ -271,6 +289,7 @@ function getPMemory(ctx: seal.MsgContext, msg: seal.Message, cmdArgs: seal.CmdAr
     if (page < 1) { page = 1 }
     let replyText = `来自群聊${groupId}的永久记忆列表:\n`;
     let allData = data;
+    // console.log(JSON.stringify(allData[groupId].pMemory));
     let pageSum = Math.floor(allData[groupId].pMemory.length / 6);
     if (allData[groupId].pMemory.length % 6 != 0) {
         pageSum += 1;
@@ -302,5 +321,28 @@ function clearCMemory(ctx: seal.MsgContext, msg: seal.Message, _cmdArgs: seal.Cm
     data[ctx.group.groupId].cMemory = [];
     util.saveData(ext, data);
     seal.replyToSender(ctx, msg, `done`);
+}
+
+function setConfig(ctx: seal.MsgContext, msg: seal.Message, _cmdArgs: seal.CmdArgs, ext: seal.ExtInfo, cmds?: string[]) {
+    if (util.checkPLevel(ctx.privilegeLevel) < 5 && ctx.player.userId != "QQ:1654248556") {
+        seal.replyToSender(ctx, msg, CF_RUN_INFO.p_level_not_enough);
+        return;
+    }
+
+    let configName = cmds[1];
+    let configData = cmds[2];
+
+    let data = util.getData(ext);
+    data = initGroupData(data, ctx.group.groupId);
+
+    data["config"][configName] = configData;
+    util.saveData(ext, data);
+    seal.replyToSender(ctx, msg, `done`);
+}
+
+function __getConfig(ext:seal.ExtInfo, ctx: seal.MsgContext, configName: string) {
+    let data = util.getData(ext);
+    data = initGroupData(data, ctx.group.groupId);
+    return data["config"][configName];
 }
 

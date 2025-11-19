@@ -3,16 +3,16 @@
  */
 class Memory {
     /** 记忆创建者（通常是用户的QQ号或昵称） */
-    private creator: string;
+    public creator: string;
 
     /** 发送对象 */
-    private role: string;
+    public role: string;
 
     /** 记忆创建时间（时间戳格式） */
-    private createTime: number;
+    public createTime: number;
 
     /** 记忆内容 */
-    private content: string;
+    public content: string;
 
     /**
      * 全参构造方法，创建记忆实例
